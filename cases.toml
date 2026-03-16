@@ -1,15 +1,21 @@
 [ch2]
-base = 0x8040_0000
+base = 0x8200_0000
 step = 0
 cases = [
-    "00hello_world",
-    "01store_fault",
-    "02power",
-    "03priv_inst",
-    "04priv_csr",
-    "08power_3",
-    "09power_5",
-    "10power_7",
+    "t3l2_step_00",
+    "t3l2_step_01",
+    "t3l2_step_02",
+    "t3l2_step_03",
+    "t3l2_step_04",
+    "t3l2_step_05",
+    "t3l2_step_06",
+    "t3l2_step_07",
+    "t3l2_step_08",
+    "t3l2_step_09",
+    "t3l2_step_10",
+    "t3l2_step_11",
+    "t3l2_step_12",
+    "t3l2_step_13",
 ]
 
 [ch3]

@@ -1,15 +1,15 @@
 [package]
-name = "tg-rcore-tutorial-user"
-description = "User-space apps for rCore Tutorial chapters (subset for ch2)."
-version = "0.4.8"
+name = "tg-rcore-tutorial-user-T3L2"
+description = "User-space apps for ch2-T3L2: dynamic step-by-step tangram OS rendering."
+version = "0.0.1-preview.1"
 edition = "2024"
-authors = ["YdrMaster <ydrml@hotmail.com>"]
-repository = "https://github.com/rcore-os/tg-rcore-tutorial-user"
-homepage = "https://github.com/rcore-os/tg-rcore-tutorial-user/tree/test"
-documentation = "https://docs.rs/tg-rcore-tutorial-user"
+authors = ["Feiran Qin <qfr23@mails.tsinghua.edu.cn>"]
+repository = "https://github.com/os-biglab/tg-rcore-tutorial-user-T3L2"
+homepage = "https://github.com/os-biglab/tg-rcore-tutorial-user-T3L2/tree/test"
+documentation = "https://github.com/os-biglab/tg-rcore-tutorial-user-T3L2/tree/test/docs"
 license = "GPL-3.0"
 readme = "README.md"
-keywords = ["rcore", "tutorial", "no-std", "riscv", "user-apps"]
+keywords = ["ai","ai4ose","kernel","learning","os"]
 categories = ["no-std", "embedded"]
 
 [lib]
@@ -23,6 +23,8 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
-tg-console = { package = "tg-rcore-tutorial-console", path = "../tg-rcore-tutorial-console", version = "0.4.2-preview.7" }
-tg-syscall = { package = "tg-rcore-tutorial-syscall", path = "../tg-rcore-tutorial-syscall", version = "0.4.2-preview.7", features = ["user"] }
+tg-console = { package = "tg-rcore-tutorial-console", version = "0.4.8" }
+tg-syscall = { package = "tg-rcore-tutorial-syscall", version = "0.4.8", features = ["user"] }
 customizable-buddy = "0.0.2"
+
+[workspace]

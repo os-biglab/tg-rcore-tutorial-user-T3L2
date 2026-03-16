@@ -14,6 +14,26 @@ use tg_console::log;
 pub use tg_console::{print, println};
 pub use tg_syscall::*;
 
+const SYSCALL_RENDER_BLOCK: usize = 0x1000_0001;
+
+#[cfg(target_arch = "riscv64")]
+pub fn render_block(block: usize) -> isize {
+    let ret: isize;
+    unsafe {
+        core::arch::asm!(
+            "ecall",
+            inlateout("a0") block as isize => ret,
+            in("a7") SYSCALL_RENDER_BLOCK,
+        );
+    }
+    ret
+}
+
+#[cfg(not(target_arch = "riscv64"))]
+pub fn render_block(_block: usize) -> isize {
+    -1
+}
+
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
 pub extern "C" fn _start() -> ! {
