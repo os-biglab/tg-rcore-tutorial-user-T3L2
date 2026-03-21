@@ -69,10 +69,9 @@ pub fn render_block(block: usize) -> isize {
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
 pub extern "C" fn _start() -> ! {
-    // 用户态运行时初始化只执行一次：批处理复用同一地址空间时避免重复注册 logger。
+    // 用户态运行时初始化只执行一次：避免批处理复用地址时重复初始化导致 panic。
     if !USER_RUNTIME_INIT.swap(true, Ordering::AcqRel) {
         tg_console::init_console(&Console);
-        tg_console::set_log_level(option_env!("LOG"));
     }
 
     unsafe extern "C" {
