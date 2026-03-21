@@ -1,7 +1,7 @@
 [package]
 name = "tg-rcore-tutorial-user-T3L2"
 description = "User-space apps for ch2-T3L2: dynamic step-by-step tangram OS rendering."
-version = "0.0.1-preview.2"
+version = "0.0.1-preview.3"
 edition = "2024"
 authors = ["Feiran Qin <qfr23@mails.tsinghua.edu.cn>"]
 repository = "https://github.com/os-biglab/tg-rcore-tutorial-user-T3L2"
