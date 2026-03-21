@@ -16,9 +16,10 @@ pub use tg_console::{print, println};
 pub use tg_syscall::*;
 
 const SYSCALL_RENDER_BLOCK: usize = 0x1000_0001;
-const FRAMEBUFFER_WIDTH: usize = 320;
-const FRAMEBUFFER_HEIGHT: usize = 200;
+const FRAMEBUFFER_WIDTH: usize = 1280;
+const FRAMEBUFFER_HEIGHT: usize = 800;
 const FRAMEBUFFER_BYTES: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT * 4;
+const FRAMEBUFFER_TRANSPARENT: u32 = 0x0000_0000;
 
 #[repr(align(16))]
 struct RenderBuffer([u8; FRAMEBUFFER_BYTES]);
@@ -56,15 +57,18 @@ pub fn render_block(block: usize) -> isize {
         let ptr = core::ptr::addr_of_mut!(RENDER_BUFFER.0) as *mut u8;
         core::slice::from_raw_parts_mut(ptr, FRAMEBUFFER_BYTES)
     };
-    framebuffer.fill(0);
-    tangram::render_block_by_index(
-        framebuffer,
-        FRAMEBUFFER_WIDTH,
-        FRAMEBUFFER_HEIGHT,
-        block,
-    );
+    // 这里不用clear也行，反正和上次是增量的
+    // clear_framebuffer(framebuffer, FRAMEBUFFER_TRANSPARENT);
+    tangram::render_block_by_index(framebuffer, FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT, block);
     submit_framebuffer(framebuffer)
 }
+
+// fn clear_framebuffer(framebuffer: &mut [u8], color: u32) {
+//     let pixel = color.to_le_bytes();
+//     for chunk in framebuffer.chunks_exact_mut(4) {
+//         chunk.copy_from_slice(&pixel);
+//     }
+// }
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
