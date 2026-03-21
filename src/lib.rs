@@ -6,23 +6,40 @@
 //! - 其余辅助函数（sleep/pipe_*）展示了常见 syscall 组合用法。
 
 mod heap;
+mod tangram;
 
 extern crate alloc;
 
-use tg_console::log;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 pub use tg_console::{print, println};
 pub use tg_syscall::*;
 
 const SYSCALL_RENDER_BLOCK: usize = 0x1000_0001;
+const FRAMEBUFFER_WIDTH: usize = 320;
+const FRAMEBUFFER_HEIGHT: usize = 200;
+const FRAMEBUFFER_BYTES: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT * 4;
+
+#[repr(align(16))]
+struct RenderBuffer([u8; FRAMEBUFFER_BYTES]);
+
+#[unsafe(link_section = ".bss.uninit")]
+static mut RENDER_BUFFER: RenderBuffer = RenderBuffer([0; FRAMEBUFFER_BYTES]);
+
+pub const BLOCK_COUNT: usize = tangram::BLOCK_COUNT;
+
+static USER_RUNTIME_INIT: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_arch = "riscv64")]
-pub fn render_block(block: usize) -> isize {
+fn submit_framebuffer(framebuffer: &[u8]) -> isize {
     let ret: isize;
     unsafe {
         core::arch::asm!(
             "ecall",
-            inlateout("a0") block as isize => ret,
+            inlateout("a0") framebuffer.as_ptr() as isize => ret,
+            in("a1") framebuffer.len(),
+            in("a2") FRAMEBUFFER_WIDTH,
+            in("a3") FRAMEBUFFER_HEIGHT,
             in("a7") SYSCALL_RENDER_BLOCK,
         );
     }
@@ -30,17 +47,33 @@ pub fn render_block(block: usize) -> isize {
 }
 
 #[cfg(not(target_arch = "riscv64"))]
-pub fn render_block(_block: usize) -> isize {
+fn submit_framebuffer(_framebuffer: &[u8]) -> isize {
     -1
+}
+
+pub fn render_block(block: usize) -> isize {
+    let framebuffer = unsafe {
+        let ptr = core::ptr::addr_of_mut!(RENDER_BUFFER.0) as *mut u8;
+        core::slice::from_raw_parts_mut(ptr, FRAMEBUFFER_BYTES)
+    };
+    framebuffer.fill(0);
+    tangram::render_block_by_index(
+        framebuffer,
+        FRAMEBUFFER_WIDTH,
+        FRAMEBUFFER_HEIGHT,
+        block,
+    );
+    submit_framebuffer(framebuffer)
 }
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
 pub extern "C" fn _start() -> ! {
-    // 用户态运行时初始化顺序与内核类似：先 I/O，再堆，再进入 main。
-    tg_console::init_console(&Console);
-    tg_console::set_log_level(option_env!("LOG"));
-    heap::init();
+    // 用户态运行时初始化只执行一次：批处理复用同一地址空间时避免重复注册 logger。
+    if !USER_RUNTIME_INIT.swap(true, Ordering::AcqRel) {
+        tg_console::init_console(&Console);
+        tg_console::set_log_level(option_env!("LOG"));
+    }
 
     unsafe extern "C" {
         fn main() -> i32;
@@ -55,9 +88,9 @@ pub extern "C" fn _start() -> ! {
 fn panic_handler(panic_info: &core::panic::PanicInfo) -> ! {
     let err = panic_info.message();
     if let Some(location) = panic_info.location() {
-        log::error!("Panicked at {}:{}, {err}", location.file(), location.line());
+        println!("[user-panic] {}:{} {err}", location.file(), location.line());
     } else {
-        log::error!("Panicked: {err}");
+        println!("[user-panic] {err}");
     }
     exit(1);
     unreachable!()

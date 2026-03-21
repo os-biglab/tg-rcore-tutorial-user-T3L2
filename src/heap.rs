@@ -3,6 +3,7 @@ use core::{
     alloc::{GlobalAlloc, Layout},
     cell::UnsafeCell,
     ptr::NonNull,
+    sync::atomic::{AtomicBool, Ordering},
 };
 use customizable_buddy::{BuddyAllocator, LinkedListBuddy, UsizeBuddy};
 
@@ -29,8 +30,13 @@ impl<T> StaticCell<T> {
 }
 
 pub fn init() {
-    // 托管空间 16 KiB
-    const MEMORY_SIZE: usize = 16 << 10;
+    static INITIALIZED: AtomicBool = AtomicBool::new(false);
+    if INITIALIZED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+
+    // 托管空间 2 MiB，用于容纳用户态渲染 framebuffer 等较大临时对象。
+    const MEMORY_SIZE: usize = 2 << 20;
     static MEMORY: StaticCell<[u8; MEMORY_SIZE]> = StaticCell::new([0u8; MEMORY_SIZE]);
     unsafe {
         heap_mut().init(
