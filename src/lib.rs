@@ -15,60 +15,76 @@ use core::sync::atomic::{AtomicBool, Ordering};
 pub use tg_console::{print, println};
 pub use tg_syscall::*;
 
-const SYSCALL_RENDER_BLOCK: usize = 0x1000_0001;
-const FRAMEBUFFER_WIDTH: usize = 1280;
-const FRAMEBUFFER_HEIGHT: usize = 800;
-const FRAMEBUFFER_BYTES: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT * 4;
-const FRAMEBUFFER_TRANSPARENT: u32 = 0x0000_0000;
-
-#[repr(align(16))]
-struct RenderBuffer([u8; FRAMEBUFFER_BYTES]);
-
-#[unsafe(link_section = ".bss.uninit")]
-static mut RENDER_BUFFER: RenderBuffer = RenderBuffer([0; FRAMEBUFFER_BYTES]);
+const SYSCALL_FRAMEBUFFER: usize = 0x1000_0001;
+const SYSCALL_FRAMEBUFFER_FLUSH: usize = 0x1000_0002;
 
 pub const BLOCK_COUNT: usize = tangram::BLOCK_COUNT;
 
 static USER_RUNTIME_INIT: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_arch = "riscv64")]
-fn submit_framebuffer(framebuffer: &[u8]) -> isize {
+fn framebuffer_info() -> Option<(*mut u8, usize, usize, usize)> {
+    let fb_ptr: isize;
+    let fb_len: usize;
+    let width: usize;
+    let height: usize;
+    unsafe {
+        core::arch::asm!(
+            "ecall",
+            inlateout("a0") 0isize => fb_ptr,
+            lateout("a1") fb_len,
+            lateout("a2") width,
+            lateout("a3") height,
+            in("a7") SYSCALL_FRAMEBUFFER,
+        );
+    }
+    if fb_ptr <= 0 || fb_len == 0 || width == 0 || height == 0 {
+        None
+    } else {
+        Some((fb_ptr as *mut u8, fb_len, width, height))
+    }
+}
+
+#[cfg(not(target_arch = "riscv64"))]
+fn framebuffer_info() -> Option<(*mut u8, usize, usize, usize)> {
+    None
+}
+
+#[cfg(target_arch = "riscv64")]
+fn framebuffer_flush() -> isize {
     let ret: isize;
     unsafe {
         core::arch::asm!(
             "ecall",
-            inlateout("a0") framebuffer.as_ptr() as isize => ret,
-            in("a1") framebuffer.len(),
-            in("a2") FRAMEBUFFER_WIDTH,
-            in("a3") FRAMEBUFFER_HEIGHT,
-            in("a7") SYSCALL_RENDER_BLOCK,
+            inlateout("a0") 0isize => ret,
+            in("a7") SYSCALL_FRAMEBUFFER_FLUSH,
         );
     }
     ret
 }
 
 #[cfg(not(target_arch = "riscv64"))]
-fn submit_framebuffer(_framebuffer: &[u8]) -> isize {
+fn framebuffer_flush() -> isize {
     -1
 }
 
 pub fn render_block(block: usize) -> isize {
-    let framebuffer = unsafe {
-        let ptr = core::ptr::addr_of_mut!(RENDER_BUFFER.0) as *mut u8;
-        core::slice::from_raw_parts_mut(ptr, FRAMEBUFFER_BYTES)
+    let Some((fb_ptr, fb_len, width, height)) = framebuffer_info() else {
+        return -1;
     };
-    // 这里不用clear也行，反正和上次是增量的
-    // clear_framebuffer(framebuffer, FRAMEBUFFER_TRANSPARENT);
-    tangram::render_block_by_index(framebuffer, FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT, block);
-    submit_framebuffer(framebuffer)
-}
 
-// fn clear_framebuffer(framebuffer: &mut [u8], color: u32) {
-//     let pixel = color.to_le_bytes();
-//     for chunk in framebuffer.chunks_exact_mut(4) {
-//         chunk.copy_from_slice(&pixel);
-//     }
-// }
+    let used_len = width
+        .checked_mul(height)
+        .and_then(|pixels| pixels.checked_mul(4))
+        .unwrap_or(0);
+    if used_len == 0 || used_len > fb_len {
+        return -1;
+    }
+
+    let framebuffer = unsafe { core::slice::from_raw_parts_mut(fb_ptr, used_len) };
+    tangram::render_block_by_index(framebuffer, width, height, block);
+    framebuffer_flush()
+}
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
